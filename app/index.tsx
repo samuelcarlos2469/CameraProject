@@ -2,6 +2,7 @@ import { AntDesign } from "@expo/vector-icons";
 import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
 import { useRef, useState } from "react";
 import { Button, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import axios from "axios";
 
 export default function Camera() {
   const [facing, setFacing] = useState<CameraType>("back");
@@ -44,23 +45,30 @@ export default function Camera() {
     try {
       setIsUploading(true);
 
-      // Obter Blob da imagem
-      const response = await fetch(photo.uri);
-      const blob = await response.blob();
-
+      // Criar o FormData e adicionar o arquivo
       const formData = new FormData();
-      formData.append("image", blob, "photo.jpg");
+      formData.append(
+        "image",
+        {
+          uri: photo.uri, // URI da imagem capturada
+          type: "image/jpeg", // Tipo do arquivo
+          name: "photo.jpg", // Nome do arquivo
+        } as unknown as Blob // Type assertion para evitar erro TS
+      );
 
-      const backendResponse = await fetch("http://10.8.34.4:5000/process", {
-        method: "POST",
-        body: formData,
-      });
+      // Enviar usando fetch
+      const response = await fetch(
+        "https://9c62-200-19-35-2.ngrok-free.app/process",
+        {
+          method: "POST",
+          body: formData,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
 
-      if (!backendResponse.ok) {
-        throw new Error("Erro no processamento do backend");
-      }
-
-      const result = await backendResponse.json();
+      const result = await response.json(); // Supondo que o backend retorna JSON
       console.log("Resultado do processamento:", result);
     } catch (error) {
       console.error("Erro ao enviar a imagem:", error);

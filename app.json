@@ -12,10 +12,12 @@
       "supportsTablet": true
     },
     "android": {
+      "usesClearTextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.samuelcarlos701.CameraProject"
     },
     "web": {
       "bundler": "metro",
@@ -36,6 +38,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "2c20c9af-f72e-4a8f-a5b2-477117390f74"
+      }
     }
   }
 }
