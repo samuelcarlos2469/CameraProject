@@ -58,7 +58,7 @@ export default function Camera() {
 
       // Enviar usando fetch
       const response = await fetch(
-        "https://9c62-200-19-35-2.ngrok-free.app/process",
+        "https://airedale-touched-mainly.ngrok-free.app/process",
         {
           method: "POST",
           body: formData,
