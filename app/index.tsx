@@ -2,7 +2,6 @@ import { AntDesign } from "@expo/vector-icons";
 import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
 import { useRef, useState } from "react";
 import { Button, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import axios from "axios";
 
 export default function Camera() {
   const [facing, setFacing] = useState<CameraType>("back");
@@ -47,14 +46,11 @@ export default function Camera() {
 
       // Criar o FormData e adicionar o arquivo
       const formData = new FormData();
-      formData.append(
-        "image",
-        {
-          uri: photo.uri, // URI da imagem capturada
-          type: "image/jpeg", // Tipo do arquivo
-          name: "photo.jpg", // Nome do arquivo
-        } as unknown as Blob // Type assertion para evitar erro TS
-      );
+      formData.append("image", {
+        uri: photo.uri,
+        type: "image/jpeg",
+        name: "photo.jpg",
+      } as unknown as Blob);
 
       // Enviar usando fetch
       const response = await fetch(
