@@ -5,7 +5,7 @@ from docx import Document
 from flask import Flask
 
 
-genai.configure(api_key="AIzaSyDqxdaEYCu3z727HXeJx3VRwyjeWkuV7e8")
+genai.configure(api_key="Chave aqui")
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 image_path = "./assets/images.jpg"
