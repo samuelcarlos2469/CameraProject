@@ -7,14 +7,15 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Image,
+  StatusBar,
 } from "react-native";
 
 export default function Camera() {
   const [facing, setFacing] = useState<CameraType>("back");
   const [permission, requestPermission] = useCameraPermissions();
   const [isUploading, setIsUploading] = useState(false);
-  const [processedImage, setProcessedImage] = useState<string | null>(null);
+  const [processedText, setProcessedText] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // Adicionado para mostrar erro
   const cameraRef = useRef<CameraView | null>(null);
 
   if (!permission) {
@@ -27,7 +28,7 @@ export default function Camera() {
         <Text style={{ textAlign: "center" }}>
           We need your permission to show the camera
         </Text>
-        <Button onPress={requestPermission} title="grant permission" />
+        <Button onPress={requestPermission} title="Grant permission" />
       </View>
     );
   }
@@ -59,7 +60,7 @@ export default function Camera() {
       } as unknown as Blob);
 
       const response = await fetch(
-        "https://airedale-touched-mainly.ngrok-free.app/process",
+        "https://backendcameraproject.onrender.com/catch",
         {
           method: "POST",
           body: formData,
@@ -69,40 +70,81 @@ export default function Camera() {
         }
       );
 
-      const result = await response.json();
-      console.log("Imagem processada:", result);
-      setProcessedImage(result.processed_image); // Mostrando imagem processada
+      if (!response.ok) {
+        const errorData = await response.json();
+        setErrorMessage(errorData.error || "Erro desconhecido");
+        setProcessedText(null);
+        console.error(
+          "Erro do backend:",
+          errorData.error || "Erro desconhecido"
+        );
+        return;
+      }
+
+      const result = await response.json(); // Esperando JSON
+      setProcessedText(result.text || "Nenhum texto encontrado.");
+      setErrorMessage(null); // Limpar erro se tudo deu certo
     } catch (error) {
       console.error("Erro ao enviar a imagem:", error);
+      setErrorMessage("Erro ao enviar a imagem. Tente novamente.");
+      setProcessedText(null);
     } finally {
       setIsUploading(false);
     }
   };
 
+  const resetState = () => {
+    setProcessedText(null);
+    setErrorMessage(null);
+  };
+
   return (
     <View style={styles.container}>
-      <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.button} onPress={toggleCameraFacing}>
-            <AntDesign name="retweet" size={44} color="black" />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent
+      />
+
+      {!processedText && !errorMessage && (
+        <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={toggleCameraFacing}
+            >
+              <AntDesign name="retweet" size={44} color="black" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleTakePhoto}
+              disabled={isUploading}
+            >
+              <AntDesign
+                name="camera"
+                size={44}
+                color={isUploading ? "gray" : "black"}
+              />
+            </TouchableOpacity>
+          </View>
+        </CameraView>
+      )}
+
+      {processedText && (
+        <View style={styles.processedTextContainer}>
+          <TouchableOpacity style={styles.closeButton} onPress={resetState}>
+            <AntDesign name="close" size={32} color="white" />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleTakePhoto}
-            disabled={isUploading}
-          >
-            <AntDesign
-              name="camera"
-              size={44}
-              color={isUploading ? "gray" : "black"}
-            />
-          </TouchableOpacity>
+          <Text style={styles.processedText}>{processedText}</Text>
         </View>
-      </CameraView>
-      {processedImage && (
-        <View style={styles.imageContainer}>
-          <Text>Imagem Processada:</Text>
-          <Image source={{ uri: processedImage }} style={styles.image} />
+      )}
+
+      {errorMessage && (
+        <View style={styles.processedTextContainer}>
+          <TouchableOpacity style={styles.closeButton} onPress={resetState}>
+            <AntDesign name="close" size={32} color="white" />
+          </TouchableOpacity>
+          <Text style={styles.processedText}>{errorMessage}</Text>
         </View>
       )}
     </View>
@@ -112,28 +154,51 @@ export default function Camera() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
+    backgroundColor: "#f0f0f5",
   },
   camera: {
     flex: 1,
+    backgroundColor: "transparent",
   },
   buttonContainer: {
     flexDirection: "row",
     justifyContent: "center",
-    marginBottom: 20,
+    position: "absolute",
+    bottom: 40,
+    width: "100%",
+    paddingHorizontal: 20,
   },
   button: {
-    marginHorizontal: 10,
-    padding: 10,
-    backgroundColor: "gray",
-    borderRadius: 10,
+    marginHorizontal: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    backgroundColor: "#FF9500",
+    borderRadius: 50,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
   },
-  imageContainer: {
+  processedTextContainer: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
-    marginTop: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    padding: 20,
   },
-  image: {
-    width: 300,
-    height: 300,
+  processedText: {
+    fontSize: 18,
+    color: "white",
+    textAlign: "center",
+    marginVertical: 20,
+  },
+  closeButton: {
+    position: "absolute",
+    top: 20,
+    right: 20,
+    backgroundColor: "#FF9500",
+    borderRadius: 25,
+    padding: 10,
   },
 });
