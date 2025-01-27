@@ -9,13 +9,14 @@ import {
   View,
   StatusBar,
 } from "react-native";
+import * as Speech from "expo-speech"; // Importando o expo-speech
 
 export default function Camera() {
   const [facing, setFacing] = useState<CameraType>("back");
   const [permission, requestPermission] = useCameraPermissions();
   const [isUploading, setIsUploading] = useState(false);
   const [processedText, setProcessedText] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null); // Adicionado para mostrar erro
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const cameraRef = useRef<CameraView | null>(null);
 
   if (!permission) {
@@ -81,9 +82,10 @@ export default function Camera() {
         return;
       }
 
-      const result = await response.json(); // Esperando JSON
+      const result = await response.json();
       setProcessedText(result.text || "Nenhum texto encontrado.");
-      setErrorMessage(null); // Limpar erro se tudo deu certo
+      setErrorMessage(null);
+      Speech.speak(result.text || "Nenhum texto encontrado."); // Fala a resposta processada
     } catch (error) {
       console.error("Erro ao enviar a imagem:", error);
       setErrorMessage("Erro ao enviar a imagem. Tente novamente.");
@@ -94,6 +96,8 @@ export default function Camera() {
   };
 
   const resetState = () => {
+    // Parando a fala e resetando os estados
+    Speech.stop();
     setProcessedText(null);
     setErrorMessage(null);
   };
@@ -105,7 +109,6 @@ export default function Camera() {
         backgroundColor="transparent"
         translucent
       />
-
       {!processedText && !errorMessage && (
         <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
           <View style={styles.buttonContainer}>
@@ -130,21 +133,14 @@ export default function Camera() {
         </CameraView>
       )}
 
-      {processedText && (
+      {(processedText || errorMessage) && (
         <View style={styles.processedTextContainer}>
           <TouchableOpacity style={styles.closeButton} onPress={resetState}>
             <AntDesign name="close" size={32} color="white" />
           </TouchableOpacity>
-          <Text style={styles.processedText}>{processedText}</Text>
-        </View>
-      )}
-
-      {errorMessage && (
-        <View style={styles.processedTextContainer}>
-          <TouchableOpacity style={styles.closeButton} onPress={resetState}>
-            <AntDesign name="close" size={32} color="white" />
-          </TouchableOpacity>
-          <Text style={styles.processedText}>{errorMessage}</Text>
+          <Text style={styles.processedText}>
+            {processedText || errorMessage}
+          </Text>
         </View>
       )}
     </View>
