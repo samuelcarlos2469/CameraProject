@@ -8,6 +8,9 @@ import {
   TouchableOpacity,
   View,
   StatusBar,
+  ScrollView,
+  Animated,
+  Easing,
 } from "react-native";
 import * as Speech from "expo-speech"; // Importando o expo-speech
 
@@ -17,6 +20,11 @@ export default function Camera() {
   const [isUploading, setIsUploading] = useState(false);
   const [processedText, setProcessedText] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSpeaking, setIsSpeaking] = useState(false); // Estado para controlar a fala
+  const [backgroundImageUri, setBackgroundImageUri] = useState<string | null>(
+    null
+  ); // Uri da imagem capturada para fundo
+  const [loadingProgress, setLoadingProgress] = useState(new Animated.Value(0)); // Para a barra de progresso
   const cameraRef = useRef<CameraView | null>(null);
 
   if (!permission) {
@@ -46,7 +54,13 @@ export default function Camera() {
         exif: false,
       };
       const photo = await cameraRef.current.takePictureAsync(options);
-      await sendPhotoToBackend(photo);
+      if (photo?.uri) {
+        // Verifica se a foto é válida
+        setBackgroundImageUri(photo.uri); // Define a imagem capturada como plano de fundo
+        await sendPhotoToBackend(photo);
+      } else {
+        console.error("Erro ao capturar a foto.");
+      }
     }
   };
 
@@ -59,6 +73,14 @@ export default function Camera() {
         type: "image/jpeg",
         name: "photo.jpg",
       } as unknown as Blob);
+
+      // Inicia animação da barra de progresso
+      Animated.timing(loadingProgress, {
+        toValue: 1,
+        duration: 3000, // Duração da animação
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }).start();
 
       const response = await fetch(
         "https://backendcameraproject.onrender.com/catch",
@@ -85,7 +107,7 @@ export default function Camera() {
       const result = await response.json();
       setProcessedText(result.text || "Nenhum texto encontrado.");
       setErrorMessage(null);
-      Speech.speak(result.text || "Nenhum texto encontrado."); // Fala a resposta processada
+      startSpeaking(result.text || "Nenhum texto encontrado."); // Inicia a fala
     } catch (error) {
       console.error("Erro ao enviar a imagem:", error);
       setErrorMessage("Erro ao enviar a imagem. Tente novamente.");
@@ -95,11 +117,30 @@ export default function Camera() {
     }
   };
 
+  const startSpeaking = (text: string) => {
+    Speech.speak(text, { onDone: () => setIsSpeaking(false) });
+    setIsSpeaking(true); // Marca que está falando
+  };
+
+  const stopSpeaking = () => {
+    Speech.stop(); // Para a fala
+    setIsSpeaking(false); // Marca que não está mais falando
+  };
+
+  const toggleSpeaking = () => {
+    if (isSpeaking) {
+      stopSpeaking();
+    } else {
+      startSpeaking(processedText || "Nenhum texto encontrado.");
+    }
+  };
+
   const resetState = () => {
-    // Parando a fala e resetando os estados
-    Speech.stop();
+    stopSpeaking();
     setProcessedText(null);
     setErrorMessage(null);
+    setBackgroundImageUri(null); // Reseta a imagem de fundo
+    loadingProgress.setValue(0); // Reseta o progresso de carregamento
   };
 
   return (
@@ -133,14 +174,55 @@ export default function Camera() {
         </CameraView>
       )}
 
+      {/* Exibe a imagem capturada como fundo com esmaecimento */}
+      {backgroundImageUri && (
+        <View style={styles.backgroundImageContainer}>
+          <Animated.Image
+            source={{ uri: backgroundImageUri }}
+            style={[styles.backgroundImage, { opacity: loadingProgress }]}
+          />
+        </View>
+      )}
+
+      {/* Barra de progresso enquanto carrega */}
+      {isUploading && (
+        <View style={styles.loadingBarContainer}>
+          <Animated.View
+            style={[
+              styles.loadingBar,
+              {
+                width: loadingProgress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ["0%", "100%"],
+                }),
+              },
+            ]}
+          />
+        </View>
+      )}
+
       {(processedText || errorMessage) && (
         <View style={styles.processedTextContainer}>
-          <TouchableOpacity style={styles.closeButton} onPress={resetState}>
-            <AntDesign name="close" size={32} color="white" />
-          </TouchableOpacity>
-          <Text style={styles.processedText}>
-            {processedText || errorMessage}
-          </Text>
+          <View style={styles.topIcons}>
+            <TouchableOpacity style={styles.iconButton} onPress={resetState}>
+              <AntDesign name="close" size={32} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={toggleSpeaking}
+            >
+              <AntDesign
+                name={isSpeaking ? "pausecircle" : "sound"}
+                size={32}
+                color="white"
+              />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.processedTextWrapper}>
+            <Text style={styles.processedText}>
+              {processedText || errorMessage}
+            </Text>
+          </ScrollView>
         </View>
       )}
     </View>
@@ -176,25 +258,58 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 6,
   },
+  backgroundImageContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  backgroundImage: {
+    flex: 1,
+    resizeMode: "cover",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  loadingBarContainer: {
+    position: "absolute",
+    top: 20,
+    left: 0,
+    right: 0,
+    height: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.6)",
+  },
+  loadingBar: {
+    height: 4,
+    backgroundColor: "#FF9500",
+  },
   processedTextContainer: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.7)",
     padding: 20,
+    marginTop: 50,
+  },
+  processedTextWrapper: {
+    marginTop: 50,
+    paddingBottom: 20,
+    maxHeight: "80%",
   },
   processedText: {
     fontSize: 18,
     color: "white",
-    textAlign: "center",
-    marginVertical: 20,
+    textAlign: "left",
   },
-  closeButton: {
-    position: "absolute",
-    top: 20,
-    right: 20,
-    backgroundColor: "#FF9500",
-    borderRadius: 25,
+  topIcons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  iconButton: {
     padding: 10,
   },
 });
