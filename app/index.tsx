@@ -1,5 +1,10 @@
-import { AntDesign } from "@expo/vector-icons";
-import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
+import { Ionicons } from "@expo/vector-icons";
+import {
+  CameraCapturedPicture,
+  CameraType,
+  CameraView,
+  useCameraPermissions,
+} from "expo-camera";
 import { useRef, useState } from "react";
 import {
   Button,
@@ -16,6 +21,7 @@ import {
   PanResponder,
   GestureResponderEvent,
   PanResponderGestureState,
+  ActivityIndicator,
 } from "react-native";
 import * as Speech from "expo-speech";
 
@@ -62,49 +68,41 @@ export default function Camera() {
     return (
       <View style={styles.container}>
         <Text style={{ textAlign: "center" }}>
-          We need your permission to show the camera
+          Precisamos de sua permissão para acessar a câmera
         </Text>
-        <Button onPress={requestPermission} title="Grant permission" />
+        <Button
+          onPress={requestPermission}
+          title="Conceder permissão"
+          accessibilityLabel="Botão para conceder permissão à câmera"
+        />
       </View>
     );
   }
 
   const handleTakePhoto = async () => {
     if (cameraRef.current) {
-      const options = {
-        quality: 1,
-        base64: false,
-        exif: false,
-      };
+      const options = { quality: 1, base64: false, exif: false };
       const photo = await cameraRef.current.takePictureAsync(options);
       if (photo?.uri) {
-        // Verifica se a foto é válida
-        setBackgroundImageUri(photo.uri); // Define a imagem capturada como plano de fundo
+        setBackgroundImageUri(photo.uri);
+        Speech.speak("Imagem capturada");
         await sendPhotoToBackend(photo);
       } else {
-        console.error("Erro ao capturar a foto.");
-        AccessibilityInfo.announceForAccessibility("Erro ao capturar a foto");
+        Speech.speak("Erro ao capturar a imagem");
       }
     }
   };
 
-  const sendPhotoToBackend = async (photo: any) => {
+  const sendPhotoToBackend = async (photo: CameraCapturedPicture) => {
     try {
       setIsUploading(true);
+      Speech.speak("Processando...");
       const formData = new FormData();
       formData.append("image", {
         uri: photo.uri,
         type: "image/jpeg",
         name: "photo.jpg",
       } as unknown as Blob);
-
-      // Inicia animação da barra de progresso
-      Animated.timing(loadingProgress, {
-        toValue: 1,
-        duration: 1000, // Duração da animação
-        easing: Easing.linear,
-        useNativeDriver: false,
-      }).start();
 
       const response = await fetch(
         "https://backendcameraproject.onrender.com/catch",
@@ -145,12 +143,14 @@ export default function Camera() {
 
   const startSpeaking = (text: string) => {
     Speech.speak(text, { onDone: () => setIsSpeaking(false) });
-    setIsSpeaking(true); // Marca que está falando
+    setIsSpeaking(true);
+    AccessibilityInfo.announceForAccessibility("Leitura iniciada");
   };
 
   const stopSpeaking = () => {
-    Speech.stop(); // Para a fala
-    setIsSpeaking(false); // Marca que não está mais falando
+    Speech.stop();
+    setIsSpeaking(false);
+    AccessibilityInfo.announceForAccessibility("Leitura pausada");
   };
 
   const toggleSpeaking = () => {
@@ -165,8 +165,8 @@ export default function Camera() {
     stopSpeaking();
     setProcessedText(null);
     setErrorMessage(null);
-    setBackgroundImageUri(null); // Reseta a imagem de fundo
-    loadingProgress.setValue(0); // Reseta o progresso de carregamento
+    setBackgroundImageUri(null);
+    loadingProgress.setValue(0);
     AccessibilityInfo.announceForAccessibility("Estado reiniciado");
   };
 
@@ -183,7 +183,10 @@ export default function Camera() {
         translucent
       />
       {!processedText && !errorMessage && (
-        <TouchableWithoutFeedback onPress={handleTakePhoto}>
+        <TouchableWithoutFeedback
+          onPress={handleTakePhoto}
+          accessibilityLabel="Toque para capturar uma foto"
+        >
           <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
             <View style={styles.buttonContainer}>
               <TouchableOpacity
@@ -192,14 +195,16 @@ export default function Camera() {
                 accessibilityLabel="Alternar câmera"
                 accessibilityHint="Alterna entre a câmera frontal e traseira"
               >
-                <AntDesign name="retweet" size={44} color="black" />
+                <Ionicons
+                  name="camera-reverse-outline"
+                  size={44}
+                  color="white"
+                />
               </TouchableOpacity>
             </View>
           </CameraView>
         </TouchableWithoutFeedback>
       )}
-
-      {/* Exibe a imagem capturada como fundo com esmaecimento */}
       {backgroundImageUri && (
         <View style={styles.backgroundImageContainer}>
           <Animated.Image
@@ -208,24 +213,12 @@ export default function Camera() {
           />
         </View>
       )}
-
-      {/* Barra de progresso enquanto carrega */}
       {isUploading && (
-        <View style={styles.loadingBarContainer}>
-          <Animated.View
-            style={[
-              styles.loadingBar,
-              {
-                width: loadingProgress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ["0%", "100%"],
-                }),
-              },
-            ]}
-          />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF9500" />
+          <Text style={styles.loadingText}>Processando...</Text>
         </View>
       )}
-
       {(processedText || errorMessage) && (
         <View style={styles.processedTextContainer}>
           <View style={styles.topIcons}>
@@ -235,7 +228,7 @@ export default function Camera() {
               accessibilityLabel="Fechar"
               accessibilityHint="Fecha a tela atual"
             >
-              <AntDesign name="close" size={32} color="white" />
+              <Ionicons name="close-circle" size={32} color="white" />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconButton}
@@ -245,8 +238,8 @@ export default function Camera() {
                 isSpeaking ? "Pausa a fala atual" : "Inicia a leitura do texto"
               }
             >
-              <AntDesign
-                name={isSpeaking ? "pausecircle" : "sound"}
+              <Ionicons
+                name={isSpeaking ? "volume-mute" : "volume-high"}
                 size={32}
                 color="white"
               />
@@ -308,17 +301,20 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  loadingBarContainer: {
+  loadingContainer: {
     position: "absolute",
-    top: 20,
+    top: 0,
     left: 0,
     right: 0,
-    height: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.6)",
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
-  loadingBar: {
-    height: 4,
-    backgroundColor: "#FF9500",
+  loadingText: {
+    color: "white",
+    fontSize: 18,
+    marginTop: 10,
   },
   processedTextContainer: {
     flex: 1,
