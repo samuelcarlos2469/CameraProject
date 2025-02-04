@@ -11,8 +11,13 @@ import {
   ScrollView,
   Animated,
   Easing,
+  AccessibilityInfo,
+  TouchableWithoutFeedback,
+  PanResponder,
+  GestureResponderEvent,
+  PanResponderGestureState,
 } from "react-native";
-import * as Speech from "expo-speech"; // Importando o expo-speech
+import * as Speech from "expo-speech";
 
 export default function Camera() {
   const [facing, setFacing] = useState<CameraType>("back");
@@ -26,6 +31,28 @@ export default function Camera() {
   ); // Uri da imagem capturada para fundo
   const [loadingProgress, setLoadingProgress] = useState(new Animated.Value(0)); // Para a barra de progresso
   const cameraRef = useRef<CameraView | null>(null);
+
+  const toggleCameraFacing = () => {
+    setFacing((current) => (current === "back" ? "front" : "back"));
+    AccessibilityInfo.announceForAccessibility("Câmera alternada");
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderRelease: (
+        evt: GestureResponderEvent,
+        gestureState: PanResponderGestureState
+      ) => {
+        if (gestureState.dx > 100) {
+          toggleCameraFacing();
+        } else if (gestureState.dx < -100) {
+          toggleCameraFacing();
+        }
+      },
+    })
+  ).current;
 
   if (!permission) {
     return <View />;
@@ -42,10 +69,6 @@ export default function Camera() {
     );
   }
 
-  const toggleCameraFacing = () => {
-    setFacing((current) => (current === "back" ? "front" : "back"));
-  };
-
   const handleTakePhoto = async () => {
     if (cameraRef.current) {
       const options = {
@@ -60,6 +83,7 @@ export default function Camera() {
         await sendPhotoToBackend(photo);
       } else {
         console.error("Erro ao capturar a foto.");
+        AccessibilityInfo.announceForAccessibility("Erro ao capturar a foto");
       }
     }
   };
@@ -77,7 +101,7 @@ export default function Camera() {
       // Inicia animação da barra de progresso
       Animated.timing(loadingProgress, {
         toValue: 1,
-        duration: 3000, // Duração da animação
+        duration: 1000, // Duração da animação
         easing: Easing.linear,
         useNativeDriver: false,
       }).start();
@@ -101,6 +125,7 @@ export default function Camera() {
           "Erro do backend:",
           errorData.error || "Erro desconhecido"
         );
+        AccessibilityInfo.announceForAccessibility("Erro do backend");
         return;
       }
 
@@ -112,6 +137,7 @@ export default function Camera() {
       console.error("Erro ao enviar a imagem:", error);
       setErrorMessage("Erro ao enviar a imagem. Tente novamente.");
       setProcessedText(null);
+      AccessibilityInfo.announceForAccessibility("Erro ao enviar a imagem");
     } finally {
       setIsUploading(false);
     }
@@ -141,37 +167,36 @@ export default function Camera() {
     setErrorMessage(null);
     setBackgroundImageUri(null); // Reseta a imagem de fundo
     loadingProgress.setValue(0); // Reseta o progresso de carregamento
+    AccessibilityInfo.announceForAccessibility("Estado reiniciado");
   };
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      accessible={true}
+      accessibilityLabel="Tela principal"
+      {...panResponder.panHandlers}
+    >
       <StatusBar
         barStyle="light-content"
         backgroundColor="transparent"
         translucent
       />
       {!processedText && !errorMessage && (
-        <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={toggleCameraFacing}
-            >
-              <AntDesign name="retweet" size={44} color="black" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={handleTakePhoto}
-              disabled={isUploading}
-            >
-              <AntDesign
-                name="camera"
-                size={44}
-                color={isUploading ? "gray" : "black"}
-              />
-            </TouchableOpacity>
-          </View>
-        </CameraView>
+        <TouchableWithoutFeedback onPress={handleTakePhoto}>
+          <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={toggleCameraFacing}
+                accessibilityLabel="Alternar câmera"
+                accessibilityHint="Alterna entre a câmera frontal e traseira"
+              >
+                <AntDesign name="retweet" size={44} color="black" />
+              </TouchableOpacity>
+            </View>
+          </CameraView>
+        </TouchableWithoutFeedback>
       )}
 
       {/* Exibe a imagem capturada como fundo com esmaecimento */}
@@ -204,12 +229,21 @@ export default function Camera() {
       {(processedText || errorMessage) && (
         <View style={styles.processedTextContainer}>
           <View style={styles.topIcons}>
-            <TouchableOpacity style={styles.iconButton} onPress={resetState}>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={resetState}
+              accessibilityLabel="Fechar"
+              accessibilityHint="Fecha a tela atual"
+            >
               <AntDesign name="close" size={32} color="white" />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconButton}
               onPress={toggleSpeaking}
+              accessibilityLabel={isSpeaking ? "Pausar fala" : "Ouvir texto"}
+              accessibilityHint={
+                isSpeaking ? "Pausa a fala atual" : "Inicia a leitura do texto"
+              }
             >
               <AntDesign
                 name={isSpeaking ? "pausecircle" : "sound"}
