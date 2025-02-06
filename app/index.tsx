@@ -26,6 +26,8 @@ import {
 import * as Speech from "expo-speech";
 
 export default function Camera() {
+  const imageOpacity = useRef(new Animated.Value(0)).current;
+  const imageScale = useRef(new Animated.Value(0.9)).current;
   const [facing, setFacing] = useState<CameraType>("back");
   const [permission, requestPermission] = useCameraPermissions();
   const [isUploading, setIsUploading] = useState(false);
@@ -86,13 +88,32 @@ export default function Camera() {
       if (photo?.uri) {
         setBackgroundImageUri(photo.uri);
         Speech.speak("Imagem capturada");
+
+        // Reset animações
+        imageOpacity.setValue(0);
+        imageScale.setValue(0.9);
+
+        // Inicia animação da imagem
+        Animated.parallel([
+          Animated.timing(imageOpacity, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(imageScale, {
+            toValue: 1,
+            duration: 1000,
+            easing: Easing.quad,
+            useNativeDriver: true,
+          }),
+        ]).start();
+
         await sendPhotoToBackend(photo);
       } else {
         Speech.speak("Erro ao capturar a imagem");
       }
     }
   };
-
   const sendPhotoToBackend = async (photo: CameraCapturedPicture) => {
     try {
       setIsUploading(true);
@@ -166,6 +187,8 @@ export default function Camera() {
     setProcessedText(null);
     setErrorMessage(null);
     setBackgroundImageUri(null);
+    imageOpacity.setValue(0);
+    imageScale.setValue(0.9);
     loadingProgress.setValue(0);
     AccessibilityInfo.announceForAccessibility("Estado reiniciado");
   };
@@ -206,19 +229,25 @@ export default function Camera() {
         </TouchableWithoutFeedback>
       )}
       {backgroundImageUri && (
-        <View style={styles.backgroundImageContainer}>
-          <Animated.Image
-            source={{ uri: backgroundImageUri }}
-            style={[styles.backgroundImage, { opacity: loadingProgress }]}
-          />
-        </View>
+        <Animated.Image
+          source={{ uri: backgroundImageUri }}
+          style={[
+            styles.backgroundImage,
+            {
+              opacity: imageOpacity, // Usa a animação de opacidade
+              transform: [{ scale: imageScale }], // Usa a animação de escala
+            },
+          ]}
+        />
       )}
+
       {isUploading && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FF9500" />
           <Text style={styles.loadingText}>Processando...</Text>
         </View>
       )}
+
       {(processedText || errorMessage) && (
         <View style={styles.processedTextContainer}>
           <View style={styles.topIcons}>
