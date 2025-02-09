@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { CameraType, CameraView } from "expo-camera";
-import { TouchableOpacity, View, TouchableWithoutFeedback } from "react-native";
+import { TouchableOpacity, View, GestureResponderEvent } from "react-native";
 import { styles } from "../style/style";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
+import { useRef } from "react";
 
 type RootStackNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -24,14 +25,29 @@ export default function CameraComponent({
   handleTakePhoto: () => void;
 }) {
   const navigation = useNavigation<RootStackNavigationProp>();
+  const lastTap = useRef(0);
+
+  const handleDoubleTap = (event: GestureResponderEvent) => {
+    const now = Date.now();
+    if (now - lastTap.current < 300) {
+      handleTakePhoto(); // Se for um toque duplo, tira a foto
+    }
+    lastTap.current = now;
+  };
 
   return (
-    <TouchableWithoutFeedback
-      onPress={handleTakePhoto}
-      accessibilityLabel="Toque para capturar uma foto"
+    <TouchableOpacity
+      activeOpacity={1}
+      style={{ flex: 1 }}
+      onPress={handleDoubleTap}
     >
-      <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
-        <View style={styles.buttonContainer}>
+      <CameraView
+        style={styles.camera}
+        facing={facing}
+        ref={cameraRef}
+        pointerEvents="auto"
+      >
+        <View style={styles.buttonContainer} pointerEvents="box-none">
           <TouchableOpacity
             style={styles.button}
             onPress={toggleCameraFacing}
@@ -46,6 +62,6 @@ export default function CameraComponent({
           </TouchableOpacity>
         </View>
       </CameraView>
-    </TouchableWithoutFeedback>
+    </TouchableOpacity>
   );
 }

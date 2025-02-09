@@ -14,13 +14,18 @@ export const useCameraSetup = () => {
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderRelease: (
-        evt: GestureResponderEvent,
-        gestureState: PanResponderGestureState
-      ) => {
-        if (Math.abs(gestureState.dx) > 100) {
+      onStartShouldSetPanResponder: (evt, gestureState) => {
+        // Se for um toque leve (pouco movimento), não ativa o PanResponder
+        return Math.abs(gestureState.dx) > 10 || Math.abs(gestureState.dy) > 10;
+      },
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Só ativa se o movimento for grande o suficiente
+        return Math.abs(gestureState.dx) > 10 || Math.abs(gestureState.dy) > 10;
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        if (gestureState.dx > 100) {
+          toggleCameraFacing();
+        } else if (gestureState.dx < -100) {
           toggleCameraFacing();
         }
       },
