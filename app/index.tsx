@@ -7,7 +7,6 @@ import {
 } from "expo-camera";
 import { useRef, useState } from "react";
 import {
-  Button,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -17,265 +16,200 @@ import {
   Animated,
   Easing,
   AccessibilityInfo,
-  TouchableWithoutFeedback,
   PanResponder,
-  GestureResponderEvent,
-  PanResponderGestureState,
   ActivityIndicator,
+  TouchableWithoutFeedback,
 } from "react-native";
 import * as Speech from "expo-speech";
 
 export default function Camera() {
-  const imageOpacity = useRef(new Animated.Value(0)).current;
-  const imageScale = useRef(new Animated.Value(0.9)).current;
   const [facing, setFacing] = useState<CameraType>("back");
   const [permission, requestPermission] = useCameraPermissions();
   const [isUploading, setIsUploading] = useState(false);
   const [processedText, setProcessedText] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isSpeaking, setIsSpeaking] = useState(false); // Estado para controlar a fala
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [backgroundImageUri, setBackgroundImageUri] = useState<string | null>(
     null
-  ); // Uri da imagem capturada para fundo
-  const [loadingProgress, setLoadingProgress] = useState(new Animated.Value(0)); // Para a barra de progresso
+  );
   const cameraRef = useRef<CameraView | null>(null);
 
+  // Animação para o overlay de processamento
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+
   const toggleCameraFacing = () => {
+    if (isUploading) return;
     setFacing((current) => (current === "back" ? "front" : "back"));
-    AccessibilityInfo.announceForAccessibility("Câmera alternada");
+    Speech.speak("Câmera alternada");
   };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderRelease: (
-        evt: GestureResponderEvent,
-        gestureState: PanResponderGestureState
-      ) => {
-        if (gestureState.dx > 100) {
-          toggleCameraFacing();
-        } else if (gestureState.dx < -100) {
-          toggleCameraFacing();
-        }
-      },
-    })
-  ).current;
-
-  if (!permission) {
-    return <View />;
-  }
-
-  if (!permission.granted) {
-    return (
-      <View style={styles.container}>
-        <Text style={{ textAlign: "center" }}>
-          Precisamos de sua permissão para acessar a câmera
-        </Text>
-        <Button
-          onPress={requestPermission}
-          title="Conceder permissão"
-          accessibilityLabel="Botão para conceder permissão à câmera"
-        />
-      </View>
-    );
-  }
 
   const handleTakePhoto = async () => {
-    if (cameraRef.current) {
-      const options = { quality: 1, base64: false, exif: false };
-      const photo = await cameraRef.current.takePictureAsync(options);
+    if (isUploading) return;
+
+    try {
+      const photo = await cameraRef.current?.takePictureAsync({
+        quality: 0.8,
+        exif: true,
+      });
+
       if (photo?.uri) {
         setBackgroundImageUri(photo.uri);
-        Speech.speak("Imagem capturada");
+        Speech.speak("Processando imagem");
 
-        // Reset animações
-        imageOpacity.setValue(0);
-        imageScale.setValue(0.9);
-
-        // Inicia animação da imagem
-        Animated.parallel([
-          Animated.timing(imageOpacity, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(imageScale, {
-            toValue: 1,
-            duration: 1000,
-            easing: Easing.quad,
-            useNativeDriver: true,
-          }),
-        ]).start();
+        // Mostra overlay de processamento
+        Animated.timing(overlayOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
 
         await sendPhotoToBackend(photo);
-      } else {
-        Speech.speak("Erro ao capturar a imagem");
       }
+    } catch (error) {
+      console.error("Erro:", error);
+      Speech.speak("Erro ao processar imagem");
     }
   };
+
   const sendPhotoToBackend = async (photo: CameraCapturedPicture) => {
+    setIsUploading(true);
+
     try {
-      setIsUploading(true);
-      Speech.speak("Processando...");
       const formData = new FormData();
       formData.append("image", {
         uri: photo.uri,
         type: "image/jpeg",
         name: "photo.jpg",
-      } as unknown as Blob);
+      } as any);
 
       const response = await fetch(
         "https://backendcameraproject.onrender.com/catch",
         {
           method: "POST",
           body: formData,
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
         }
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        setErrorMessage(errorData.error || "Erro desconhecido");
-        setProcessedText(null);
-        console.error(
-          "Erro do backend:",
-          errorData.error || "Erro desconhecido"
-        );
-        AccessibilityInfo.announceForAccessibility("Erro do backend");
-        return;
-      }
-
       const result = await response.json();
-      setProcessedText(result.text || "Nenhum texto encontrado.");
-      setErrorMessage(null);
-      startSpeaking(result.text || "Nenhum texto encontrado."); // Inicia a fala
+      setProcessedText(result.text || "Nenhum texto identificado");
+      Speech.speak(result.text || "Nenhum texto identificado");
     } catch (error) {
-      console.error("Erro ao enviar a imagem:", error);
-      setErrorMessage("Erro ao enviar a imagem. Tente novamente.");
-      setProcessedText(null);
-      AccessibilityInfo.announceForAccessibility("Erro ao enviar a imagem");
+      setErrorMessage("Erro na conexão");
+      Speech.speak("Erro ao conectar com o servidor");
     } finally {
       setIsUploading(false);
-    }
-  };
-
-  const startSpeaking = (text: string) => {
-    Speech.speak(text, { onDone: () => setIsSpeaking(false) });
-    setIsSpeaking(true);
-    AccessibilityInfo.announceForAccessibility("Leitura iniciada");
-  };
-
-  const stopSpeaking = () => {
-    Speech.stop();
-    setIsSpeaking(false);
-    AccessibilityInfo.announceForAccessibility("Leitura pausada");
-  };
-
-  const toggleSpeaking = () => {
-    if (isSpeaking) {
-      stopSpeaking();
-    } else {
-      startSpeaking(processedText || "Nenhum texto encontrado.");
+      Animated.timing(overlayOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     }
   };
 
   const resetState = () => {
-    stopSpeaking();
     setProcessedText(null);
     setErrorMessage(null);
     setBackgroundImageUri(null);
-    imageOpacity.setValue(0);
-    imageScale.setValue(0.9);
-    loadingProgress.setValue(0);
-    AccessibilityInfo.announceForAccessibility("Estado reiniciado");
+    Speech.stop();
   };
 
+  if (!permission) return <View />;
+
+  if (!permission.granted) {
+    return (
+      <View style={styles.permissionContainer}>
+        <Text style={styles.permissionText}>
+          Precisamos de acesso à câmera para funcionar
+        </Text>
+        <TouchableOpacity
+          style={styles.permissionButton}
+          onPress={requestPermission}
+          accessibilityLabel="Conceder permissão"
+        >
+          <Text style={styles.permissionButtonText}>Permitir acesso</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
-    <View
-      style={styles.container}
-      accessible={true}
-      accessibilityLabel="Tela principal"
-      {...panResponder.panHandlers}
-    >
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="transparent"
-        translucent
-      />
-      {!processedText && !errorMessage && (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" translucent />
+
+      {/* Área principal da câmera */}
+      {!processedText && (
         <TouchableWithoutFeedback
           onPress={handleTakePhoto}
-          accessibilityLabel="Toque para capturar uma foto"
+          accessibilityLabel="Toque para capturar imagem"
         >
-          <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity
-                style={styles.button}
-                onPress={toggleCameraFacing}
-                accessibilityLabel="Alternar câmera"
-                accessibilityHint="Alterna entre a câmera frontal e traseira"
-              >
-                <Ionicons
-                  name="camera-reverse-outline"
-                  size={44}
-                  color="white"
-                />
-              </TouchableOpacity>
-            </View>
+          <CameraView
+            ref={cameraRef}
+            style={styles.camera}
+            facing={facing}
+            enableTorch={false}
+          >
+            {/* Botão de informações (placeholder) */}
+            <TouchableOpacity
+              style={styles.infoButton}
+              accessibilityLabel="Informações do projeto"
+              accessibilityHint="Mostra detalhes sobre os criadores do aplicativo"
+            >
+              <Ionicons name="information-circle" size={34} color="white" />
+            </TouchableOpacity>
+
+            {/* Botão para virar câmera */}
+            <TouchableOpacity
+              style={styles.flipButton}
+              onPress={toggleCameraFacing}
+              accessibilityLabel="Alternar câmera"
+            >
+              <Ionicons name="camera-reverse" size={34} color="white" />
+            </TouchableOpacity>
           </CameraView>
         </TouchableWithoutFeedback>
       )}
-      {backgroundImageUri && (
-        <Animated.Image
-          source={{ uri: backgroundImageUri }}
-          style={[
-            styles.backgroundImage,
-            {
-              opacity: imageOpacity, // Usa a animação de opacidade
-              transform: [{ scale: imageScale }], // Usa a animação de escala
-            },
-          ]}
-        />
-      )}
 
-      {isUploading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF9500" />
-          <Text style={styles.loadingText}>Processando...</Text>
-        </View>
-      )}
+      {/* Overlay de processamento */}
+      <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
+        {backgroundImageUri && (
+          <Animated.Image
+            source={{ uri: backgroundImageUri }}
+            style={[styles.backgroundImage]}
+            blurRadius={4}
+          />
+        )}
+        <ActivityIndicator size="large" color="white" />
+        <Text style={styles.loadingText}>Processando...</Text>
+      </Animated.View>
 
+      {/* Tela de resultados */}
       {(processedText || errorMessage) && (
-        <View style={styles.processedTextContainer}>
-          <View style={styles.topIcons}>
+        <View style={styles.resultContainer}>
+          <Animated.Image
+            source={{ uri: backgroundImageUri! }}
+            style={[styles.backgroundImage, styles.dimmedBackground]}
+          />
+
+          <View style={styles.resultControls}>
             <TouchableOpacity
-              style={styles.iconButton}
               onPress={resetState}
-              accessibilityLabel="Fechar"
-              accessibilityHint="Fecha a tela atual"
+              style={styles.controlButton}
+              accessibilityLabel="Fechar resultados"
             >
-              <Ionicons name="close-circle" size={32} color="white" />
+              <Ionicons name="close" size={34} color="white" />
             </TouchableOpacity>
+
             <TouchableOpacity
-              style={styles.iconButton}
-              onPress={toggleSpeaking}
-              accessibilityLabel={isSpeaking ? "Pausar fala" : "Ouvir texto"}
-              accessibilityHint={
-                isSpeaking ? "Pausa a fala atual" : "Inicia a leitura do texto"
-              }
+              onPress={() => Speech.stop()}
+              style={styles.controlButton}
+              accessibilityLabel="Parar leitura"
             >
-              <Ionicons
-                name={isSpeaking ? "volume-mute" : "volume-high"}
-                size={32}
-                color="white"
-              />
+              <Ionicons name="stop-circle" size={34} color="white" />
             </TouchableOpacity>
           </View>
-          <ScrollView style={styles.processedTextWrapper}>
-            <Text style={styles.processedText}>
+
+          <ScrollView contentContainerStyle={styles.resultContent}>
+            <Text style={styles.resultText}>
               {processedText || errorMessage}
             </Text>
           </ScrollView>
@@ -288,87 +222,85 @@ export default function Camera() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f0f0f5",
+    backgroundColor: "black",
   },
   camera: {
     flex: 1,
-    backgroundColor: "transparent",
   },
-  buttonContainer: {
-    flexDirection: "row",
+  permissionContainer: {
+    flex: 1,
     justifyContent: "center",
-    position: "absolute",
-    bottom: 40,
-    width: "100%",
-    paddingHorizontal: 20,
+    alignItems: "center",
+    padding: 20,
   },
-  button: {
-    marginHorizontal: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
+  permissionText: {
+    fontSize: 18,
+    textAlign: "center",
+    marginBottom: 30,
+    color: "#333",
+  },
+  permissionButton: {
     backgroundColor: "#FF9500",
-    borderRadius: 50,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 25,
   },
-  backgroundImageContainer: {
+  permissionButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  infoButton: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 50,
+    left: 20,
+    padding: 10,
+  },
+  flipButton: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    padding: 10,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   backgroundImage: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     resizeMode: "cover",
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
   },
-  loadingContainer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
+  dimmedBackground: {
+    opacity: 0.4,
   },
   loadingText: {
     color: "white",
-    fontSize: 18,
-    marginTop: 10,
+    fontSize: 20,
+    marginTop: 20,
   },
-  processedTextContainer: {
-    flex: 1,
-    justifyContent: "flex-start",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    padding: 20,
-    marginTop: 50,
+  resultContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.85)",
   },
-  processedTextWrapper: {
-    marginTop: 50,
-    paddingBottom: 20,
-    maxHeight: "80%",
-  },
-  processedText: {
-    fontSize: 18,
-    color: "white",
-    textAlign: "left",
-  },
-  topIcons: {
+  resultControls: {
     flexDirection: "row",
     justifyContent: "space-between",
-    width: "100%",
+    padding: 20,
+    marginTop: 40,
   },
-  iconButton: {
-    padding: 10,
+  controlButton: {
+    padding: 15,
+  },
+  resultContent: {
+    flexGrow: 1,
+    padding: 20,
+    paddingTop: 0,
+  },
+  resultText: {
+    color: "white",
+    fontSize: 20,
+    lineHeight: 28,
   },
 });
