@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { CameraType, CameraView } from "expo-camera";
 import { TouchableOpacity, View, GestureResponderEvent } from "react-native";
-import { styles } from "../style/style";
+import { cameraStyles } from "../style/styles";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { useRef } from "react";
@@ -42,14 +42,13 @@ export default function CameraComponent({
       onPress={handleDoubleTap}
     >
       <CameraView
-        style={styles.camera}
+        style={cameraStyles.cameraView}
         facing={facing}
         ref={cameraRef}
-        pointerEvents="auto"
       >
-        <View style={styles.buttonContainer} pointerEvents="box-none">
+        <View style={cameraStyles.buttonContainer} pointerEvents="box-none">
           <TouchableOpacity
-            style={styles.button}
+            style={cameraStyles.cameraButton}
             onPress={toggleCameraFacing}
             accessibilityLabel="Alternar câmera"
             accessibilityHint="Alterna entre a câmera frontal e traseira"
@@ -58,7 +57,7 @@ export default function CameraComponent({
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.button} // Aplica o mesmo estilo para uniformizar
+            style={cameraStyles.cameraButton} // Aplica o mesmo estilo para uniformizar
             onPress={() => navigation.navigate("ListScreen")}
           >
             <Ionicons name="logo-github" size={32} color="white" />

@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, Linking } from "react-native";
-import { styles } from "../style/style";
+import { listStyles } from "../style/styles";
 
 const linkedInProfiles = [
   {
@@ -14,14 +14,14 @@ const linkedInProfiles = [
 
 export default function GitList() {
   return (
-    <View style={styles.containerLista}>
+    <View style={listStyles.container}>
       {linkedInProfiles.map((profile, index) => (
         <TouchableOpacity
           key={index}
-          style={styles.profileButton}
+          style={listStyles.profileButton}
           onPress={() => Linking.openURL(profile.url)}
         >
-          <Text style={styles.profileText}>{profile.name}</Text>
+          <Text style={listStyles.profileText}>{profile.name}</Text>
         </TouchableOpacity>
       ))}
     </View>
