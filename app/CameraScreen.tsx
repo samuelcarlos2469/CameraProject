@@ -8,47 +8,21 @@ import {
   Button,
   AccessibilityInfo,
   Easing,
+  Platform,
 } from "react-native";
 import { useCameraSetup } from "../assets/hooks/useCameraSetup";
 import CameraComponent from "../assets/components/Camera";
 import { TextProcessor } from "../assets/components/TextProcessor";
+import useImageOrientation from "../assets/hooks/useImageOrientation";
 import {
   cameraStyles,
   textProcessorStyles,
   baseStyles,
+  styles,
 } from "../assets/style/styles";
 import * as Speech from "expo-speech";
 import { CameraCapturedPicture } from "expo-camera";
 import * as ImageManipulator from "expo-image-manipulator";
-
-const fixImageOrientation = async (photo: CameraCapturedPicture) => {
-  try {
-    const { width, height, exif } = photo;
-    let rotate = 0;
-
-    // Corrige a orientação com base na exif ou dimensões da imagem
-    if (exif?.Orientation === 6) {
-      rotate = 90;
-    } else if (exif?.Orientation === 8) {
-      rotate = -90;
-    } else if (exif?.Orientation === 3) {
-      rotate = 180;
-    } else if (width > height) {
-      rotate = 90;
-    }
-
-    const manipulatedPhoto = await ImageManipulator.manipulateAsync(
-      photo.uri,
-      [{ rotate }],
-      { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
-    );
-
-    return manipulatedPhoto;
-  } catch (error) {
-    console.error("Erro ao corrigir a orientação da imagem:", error);
-    return photo;
-  }
-};
 
 export default function CameraScreen() {
   const {
@@ -67,11 +41,23 @@ export default function CameraScreen() {
   );
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
-  const [imageRotation, setImageRotation] = useState(0);
+  const { imageRotation, fixImageOrientation } = useImageOrientation();
 
   const imageOpacity = useRef(new Animated.Value(0)).current;
   const imageScale = useRef(new Animated.Value(0.9)).current;
   const [loadingProgress, setLoadingProgress] = useState(new Animated.Value(0));
+  const rotationStyle = Platform.select({
+    android: {
+      transform: [
+        { scale: imageScale },
+        { rotate: `${imageRotation}deg` }, // Separe as transformações
+        { scaleX: Math.abs(imageRotation % 180) === 90 ? -1 : 1 },
+      ],
+    },
+    ios: {
+      transform: [{ scale: imageScale }, { rotate: `${imageRotation}deg` }],
+    },
+  });
 
   const handleTakePhoto = async () => {
     if (isCapturing) return;
@@ -79,11 +65,14 @@ export default function CameraScreen() {
 
     if (cameraRef.current) {
       try {
-        const options = { quality: 1, base64: false, exif: true };
-        const photo = await cameraRef.current.takePictureAsync(options);
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 1,
+          exif: true,
+          skipProcessing: Platform.OS === "android", // Adicione esta linha
+        });
 
         if (photo?.uri) {
-          const fixedPhoto = await fixImageOrientation(photo);
+          const fixedPhoto = await fixImageOrientation(photo); // Usa o hook
           setBackgroundImageUri(fixedPhoto.uri);
           Speech.speak("Imagem capturada");
 
@@ -109,7 +98,6 @@ export default function CameraScreen() {
             await processImage(fixedPhoto);
             setIsUploading(false);
           }
-        } else {
           Speech.speak("Erro ao capturar a imagem");
         }
       } catch (error) {
@@ -239,19 +227,18 @@ export default function CameraScreen() {
       )}
 
       {backgroundImageUri && (
-        <Animated.Image
-          source={{ uri: backgroundImageUri }}
-          style={[
-            cameraStyles.backgroundImage,
-            {
-              opacity: imageOpacity,
-              transform: [
-                { scale: imageScale },
-                { rotate: `${imageRotation}deg` },
-              ],
-            },
-          ]}
-        />
+        <View style={cameraStyles.backgroundImageContainer}>
+          <Animated.Image
+            source={{ uri: backgroundImageUri }}
+            style={[
+              cameraStyles.backgroundImage,
+              rotationStyle,
+              {
+                opacity: imageOpacity,
+              },
+            ]}
+          />
+        </View>
       )}
 
       {isUploading && (

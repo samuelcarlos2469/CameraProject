@@ -2,6 +2,15 @@
 import { StyleSheet } from "react-native";
 import { theme } from "./theme";
 
+export const styles = StyleSheet.create({
+    imageFix: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'contain',
+      position: 'absolute',
+    },
+  });
+
 export const cameraStyles = StyleSheet.create({
   container: {
     flex: 1,
@@ -27,9 +36,16 @@ export const cameraStyles = StyleSheet.create({
     alignItems: "center",
     ...theme.shadows.md,
   },
-  backgroundImage: {
+  backgroundImageContainer: {
     ...StyleSheet.absoluteFillObject,
-    resizeMode: "cover",
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backgroundImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
+    position: 'absolute',
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
