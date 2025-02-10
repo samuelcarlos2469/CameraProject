@@ -30,7 +30,7 @@ export default function CameraComponent({
   const handleDoubleTap = (event: GestureResponderEvent) => {
     const now = Date.now();
     if (now - lastTap.current < 300) {
-      handleTakePhoto(); // Se for um toque duplo, tira a foto
+      handleTakePhoto();
     }
     lastTap.current = now;
   };

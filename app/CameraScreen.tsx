@@ -13,16 +13,9 @@ import {
 import { useCameraSetup } from "../assets/hooks/useCameraSetup";
 import CameraComponent from "../assets/components/Camera";
 import { TextProcessor } from "../assets/components/TextProcessor";
-import useImageOrientation from "../assets/hooks/useImageOrientation";
-import {
-  cameraStyles,
-  textProcessorStyles,
-  baseStyles,
-  styles,
-} from "../assets/style/styles";
+import { cameraStyles } from "../assets/style/styles";
 import * as Speech from "expo-speech";
 import { CameraCapturedPicture } from "expo-camera";
-import * as ImageManipulator from "expo-image-manipulator";
 
 export default function CameraScreen() {
   const {
@@ -36,28 +29,10 @@ export default function CameraScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [processedText, setProcessedText] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [backgroundImageUri, setBackgroundImageUri] = useState<string | null>(
-    null
-  );
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
-  const { imageRotation, fixImageOrientation } = useImageOrientation();
 
-  const imageOpacity = useRef(new Animated.Value(0)).current;
-  const imageScale = useRef(new Animated.Value(0.9)).current;
   const [loadingProgress, setLoadingProgress] = useState(new Animated.Value(0));
-  const rotationStyle = Platform.select({
-    android: {
-      transform: [
-        { scale: imageScale },
-        { rotate: `${imageRotation}deg` }, // Separe as transformações
-        { scaleX: Math.abs(imageRotation % 180) === 90 ? -1 : 1 },
-      ],
-    },
-    ios: {
-      transform: [{ scale: imageScale }, { rotate: `${imageRotation}deg` }],
-    },
-  });
 
   const handleTakePhoto = async () => {
     if (isCapturing) return;
@@ -68,34 +43,14 @@ export default function CameraScreen() {
         const photo = await cameraRef.current.takePictureAsync({
           quality: 1,
           exif: true,
-          skipProcessing: Platform.OS === "android", // Adicione esta linha
         });
 
         if (photo?.uri) {
-          const fixedPhoto = await fixImageOrientation(photo); // Usa o hook
-          setBackgroundImageUri(fixedPhoto.uri);
           Speech.speak("Imagem capturada");
-
-          imageOpacity.setValue(0);
-          imageScale.setValue(0.9);
-
-          Animated.parallel([
-            Animated.timing(imageOpacity, {
-              toValue: 1,
-              duration: 1000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(imageScale, {
-              toValue: 1,
-              duration: 1000,
-              easing: Easing.quad,
-              useNativeDriver: true,
-            }),
-          ]).start();
 
           if (!isUploading) {
             setIsUploading(true);
-            await processImage(fixedPhoto);
+            await processImage(photo);
             setIsUploading(false);
           }
           Speech.speak("Erro ao capturar a imagem");
@@ -181,9 +136,6 @@ export default function CameraScreen() {
     stopSpeaking();
     setProcessedText(null);
     setErrorMessage(null);
-    setBackgroundImageUri(null);
-    imageOpacity.setValue(0);
-    imageScale.setValue(0.9);
     loadingProgress.setValue(0);
     AccessibilityInfo.announceForAccessibility("Estado reiniciado");
   };
@@ -224,21 +176,6 @@ export default function CameraScreen() {
           toggleCameraFacing={toggleCameraFacing}
           handleTakePhoto={handleTakePhoto}
         />
-      )}
-
-      {backgroundImageUri && (
-        <View style={cameraStyles.backgroundImageContainer}>
-          <Animated.Image
-            source={{ uri: backgroundImageUri }}
-            style={[
-              cameraStyles.backgroundImage,
-              rotationStyle,
-              {
-                opacity: imageOpacity,
-              },
-            ]}
-          />
-        </View>
       )}
 
       {isUploading && (
