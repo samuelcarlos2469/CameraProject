@@ -54,11 +54,14 @@ export default function CameraComponent({
             accessibilityLabel="Alternar câmera"
             accessibilityHint="Alterna entre a câmera frontal e traseira"
           >
-            <Ionicons name="camera-reverse-outline" size={44} color="white" />
+            <Ionicons name="camera-reverse-outline" size={32} color="white" />
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => navigation.navigate("ListScreen")}>
-            <Ionicons name="logo-github" size={32} color="#0077B5" />
+          <TouchableOpacity
+            style={styles.button} // Aplica o mesmo estilo para uniformizar
+            onPress={() => navigation.navigate("ListScreen")}
+          >
+            <Ionicons name="logo-github" size={32} color="white" />
           </TouchableOpacity>
         </View>
       </CameraView>

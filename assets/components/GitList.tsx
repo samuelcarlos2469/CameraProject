@@ -14,13 +14,14 @@ const linkedInProfiles = [
 
 export default function GitList() {
   return (
-    <View style={styles.container}>
+    <View style={styles.containerLista}>
       {linkedInProfiles.map((profile, index) => (
         <TouchableOpacity
           key={index}
+          style={styles.profileButton}
           onPress={() => Linking.openURL(profile.url)}
         >
-          <Text>{profile.name}</Text>
+          <Text style={styles.profileText}>{profile.name}</Text>
         </TouchableOpacity>
       ))}
     </View>
