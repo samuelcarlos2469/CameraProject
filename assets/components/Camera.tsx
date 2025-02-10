@@ -58,7 +58,7 @@ export default function CameraComponent({
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => navigation.navigate("ListScreen")}>
-            <Ionicons name="logo-linkedin" size={32} color="#0077B5" />
+            <Ionicons name="logo-github" size={32} color="#0077B5" />
           </TouchableOpacity>
         </View>
       </CameraView>

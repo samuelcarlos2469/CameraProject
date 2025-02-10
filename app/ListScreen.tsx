@@ -1,11 +1,11 @@
 import { View } from "react-native";
-import LinkedInList from "../assets/components/LinkedinList";
+import GitList from "../assets/components/GitList";
 import { styles } from "../assets/style/style";
 
 export default function ListScreen() {
   return (
     <View style={styles.container}>
-      <LinkedInList />
+      <GitList />
     </View>
   );
 }
