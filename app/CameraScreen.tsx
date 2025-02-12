@@ -8,38 +8,14 @@ import {
   Button,
   AccessibilityInfo,
   Easing,
+  Platform,
 } from "react-native";
 import { useCameraSetup } from "../assets/hooks/useCameraSetup";
 import CameraComponent from "../assets/components/Camera";
 import { TextProcessor } from "../assets/components/TextProcessor";
-import { styles } from "../assets/style/style";
+import { cameraStyles } from "../assets/style/styles";
 import * as Speech from "expo-speech";
 import { CameraCapturedPicture } from "expo-camera";
-import * as ImageManipulator from "expo-image-manipulator";
-
-const fixImageOrientation = async (photo: CameraCapturedPicture) => {
-  try {
-    // 📌 Garante que a rotação seja correta baseada no tamanho da imagem
-    const { width, height } = photo;
-    let rotate = 0;
-
-    if (width > height) {
-      // Se a largura for maior que a altura, significa que está na horizontal
-      rotate = 90; // Rotaciona para ficar em retrato
-    }
-
-    const manipulatedPhoto = await ImageManipulator.manipulateAsync(
-      photo.uri,
-      [{ rotate }],
-      { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
-    );
-
-    return manipulatedPhoto;
-  } catch (error) {
-    console.error("Erro ao corrigir a orientação da imagem:", error);
-    return photo; // Retorna a imagem original caso falhe
-  }
-};
 
 export default function CameraScreen() {
   const {
@@ -53,15 +29,9 @@ export default function CameraScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [processedText, setProcessedText] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [backgroundImageUri, setBackgroundImageUri] = useState<string | null>(
-    null
-  );
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
-  const [imageRotation, setImageRotation] = useState(0);
 
-  const imageOpacity = useRef(new Animated.Value(0)).current;
-  const imageScale = useRef(new Animated.Value(0.9)).current;
   const [loadingProgress, setLoadingProgress] = useState(new Animated.Value(0));
 
   const handleTakePhoto = async () => {
@@ -70,41 +40,19 @@ export default function CameraScreen() {
 
     if (cameraRef.current) {
       try {
-        const options = { quality: 1, base64: false, exif: true };
-        const photo = await cameraRef.current.takePictureAsync(options);
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 1,
+          exif: true,
+        });
 
         if (photo?.uri) {
-          // 📌 Corrige a orientação antes de definir a imagem
-          const fixedPhoto = await fixImageOrientation(photo);
-
-          setBackgroundImageUri(fixedPhoto.uri);
           Speech.speak("Imagem capturada");
-
-          // Reset animações
-          imageOpacity.setValue(0);
-          imageScale.setValue(0.9);
-
-          // Inicia animação da imagem
-          Animated.parallel([
-            Animated.timing(imageOpacity, {
-              toValue: 1,
-              duration: 1000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(imageScale, {
-              toValue: 1,
-              duration: 1000,
-              easing: Easing.quad,
-              useNativeDriver: true,
-            }),
-          ]).start();
 
           if (!isUploading) {
             setIsUploading(true);
-            await processImage(fixedPhoto);
+            await processImage(photo);
             setIsUploading(false);
           }
-        } else {
           Speech.speak("Erro ao capturar a imagem");
         }
       } catch (error) {
@@ -152,7 +100,7 @@ export default function CameraScreen() {
       const result = await response.json();
       setProcessedText(result.text || "Nenhum texto encontrado.");
       setErrorMessage(null);
-      startSpeaking(result.text || "Nenhum texto encontrado."); // Inicia a fala
+      startSpeaking(result.text || "Nenhum texto encontrado.");
     } catch (error) {
       console.error("Erro ao enviar a imagem:", error);
       setErrorMessage("Erro ao enviar a imagem. Tente novamente.");
@@ -188,16 +136,13 @@ export default function CameraScreen() {
     stopSpeaking();
     setProcessedText(null);
     setErrorMessage(null);
-    setBackgroundImageUri(null);
-    imageOpacity.setValue(0);
-    imageScale.setValue(0.9);
     loadingProgress.setValue(0);
     AccessibilityInfo.announceForAccessibility("Estado reiniciado");
   };
 
   if (!permission?.granted) {
     return (
-      <View style={styles.container}>
+      <View style={cameraStyles.container}>
         <Text style={{ textAlign: "center" }}>
           Precisamos de sua permissão para acessar a câmera
         </Text>
@@ -212,7 +157,7 @@ export default function CameraScreen() {
 
   return (
     <View
-      style={styles.container}
+      style={cameraStyles.container}
       accessible={true}
       accessibilityLabel="Tela principal"
       {...panResponder.panHandlers}
@@ -233,26 +178,10 @@ export default function CameraScreen() {
         />
       )}
 
-      {backgroundImageUri && (
-        <Animated.Image
-          source={{ uri: backgroundImageUri }}
-          style={[
-            styles.backgroundImage,
-            {
-              opacity: imageOpacity,
-              transform: [
-                { scale: imageScale },
-                { rotate: `${imageRotation}deg` },
-              ],
-            },
-          ]}
-        />
-      )}
-
       {isUploading && (
-        <View style={styles.loadingContainer}>
+        <View style={cameraStyles.loadingOverlay}>
           <ActivityIndicator size="large" color="#FF9500" />
-          <Text style={styles.loadingText}>Processando...</Text>
+          <Text style={cameraStyles.loadingText}>Processando...</Text>
         </View>
       )}
 

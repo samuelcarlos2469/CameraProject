@@ -1,6 +1,6 @@
 import { View, ScrollView, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { styles } from "../style/style";
+import { textProcessorStyles } from "../style/styles";
 
 export const TextProcessor = ({
   processedText,
@@ -15,10 +15,10 @@ export const TextProcessor = ({
   toggleSpeaking: () => void;
   resetState: () => void;
 }) => (
-  <View style={styles.processedTextContainer}>
-    <View style={styles.topIcons}>
+  <View style={textProcessorStyles.container}>
+    <View style={textProcessorStyles.header}>
       <TouchableOpacity
-        style={styles.iconButton}
+        style={textProcessorStyles.iconButton}
         onPress={resetState}
         accessibilityLabel="Fechar"
         accessibilityHint="Fecha a tela atual"
@@ -26,7 +26,7 @@ export const TextProcessor = ({
         <Ionicons name="close-circle" size={32} color="white" />
       </TouchableOpacity>
       <TouchableOpacity
-        style={styles.iconButton}
+        style={textProcessorStyles.iconButton}
         onPress={toggleSpeaking}
         accessibilityLabel={isSpeaking ? "Pausar fala" : "Ouvir texto"}
         accessibilityHint={
@@ -40,8 +40,10 @@ export const TextProcessor = ({
         />
       </TouchableOpacity>
     </View>
-    <ScrollView style={styles.processedTextWrapper}>
-      <Text style={styles.processedText}>{processedText || errorMessage}</Text>
+    <ScrollView style={textProcessorStyles.scroll}>
+      <Text style={textProcessorStyles.text}>
+        {processedText || errorMessage}
+      </Text>
     </ScrollView>
   </View>
 );
